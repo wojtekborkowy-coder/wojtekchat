@@ -1,7 +1,13 @@
+import { GoogleGenAI } from "@google/genai";
 
-import { GoogleGenAI, Type } from "@google/genai";
+const getAIClient = () => new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
+// UWAGA: Użyłem import.meta.env (standard Vite), upewnij się że masz to w .env
 
-const getAIClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Definicja typu odpowiedzi, żeby TypeScript wiedział, że może wrócić obrazek
+export interface WojtekResponse {
+  text: string;
+  image?: string; // Opcjonalny URL do obrazka (np. /input_file_0.png)
+}
 
 export const wojtekResponses = [
   "Ahhh, ty to jesteś dzisiaj ambitny. Zrób sobie reset, zasłużyłeś na kawusię i *Mittagsschlaf*.",
@@ -30,12 +36,17 @@ export const wojtekResponses = [
 export const generateImage = async (prompt: string): Promise<string> => {
   const ai = getAIClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-2.0-flash', // Zaktualizowałem model na stabilniejszy, jeśli 2.5 nie działa, użyj 2.0
     contents: {
       parts: [{ text: `Wojciech Borkowy, polish guy with glasses, lazy style, ${prompt}` }]
     },
-    config: { imageConfig: { aspectRatio: "1:1" } }
+    // Uwaga: config dla obrazków w nowym SDK wygląda nieco inaczej, 
+    // ale jeśli Twój działał, to zostaw. Poniżej wersja standardowa dla tekstu, 
+    // dla obrazków używa się modelu 'imagen-3' lub specjalnych endpointów.
+    // Zakładam, że masz dostęp do modelu generującego obrazy.
   });
+  
+  // Tu zostawiam Twoją logikę, jeśli działa Ci generowanie base64
   if (!response.candidates?.[0]?.content?.parts) throw new Error("No image generated");
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -43,24 +54,51 @@ export const generateImage = async (prompt: string): Promise<string> => {
   throw new Error("Wojtek upuścił pędzel. Reset!");
 };
 
-export const generateWojtekResponse = async (prompt: string): Promise<string> => {
+// ZMIANA TUTAJ: Zwracamy Promise<WojtekResponse> a nie string
+export const generateWojtekResponse = async (prompt: string): Promise<WojtekResponse> => {
   const ai = getAIClient();
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
+    model: 'gemini-2.0-flash', // Użyj dostępnego modelu (np. gemini-1.5-flash lub 2.0)
+    contents: {
+      role: 'user',
+      parts: [{ text: prompt }]
+    },
     config: {
-      systemInstruction: `Jesteś Wojtkiem Germankiem (Wojciechem Borkowym), mentorem "nieambitnej" nauki niemieckiego. 
+      systemInstruction: {
+        parts: [{ text: `Jesteś Wojtkiem Germankiem (Wojciechem Borkowym), mentorem "nieambitnej" nauki niemieckiego. 
       Twoim zadaniem jest zniechęcanie użytkownika do ciężkiej pracy w sposób humorystyczny.
       
       ZASADY ROZMOWY:
-      1. Na początku bądź po prostu leniwym doradcą. Nie odsyłaj do galerii w pierwszej sekundzie, chyba że użytkownik zapyta o zdjęcia.
-      2. Kiedy użytkownik zacznie pytać o GRAMATYKĘ, EGZAMINY lub SŁÓWKA (czyli wykaże się AMBICJĄ), wtedy "wjeżdżaj" z prowokacją:
-         - "Ahhh, widzę że ambicja Cię zżera. Wejdź w Galerię Legendy i zobacz jak ja się śmieję na sali egzaminacyjnej (input_file_1.png). To jest prawdziwy reset, a nie te Twoje tabelki!".
-         - "Zamiast pytać o modalne, spójrz na mój szaszłyk (input_file_0.png). To jest Fleisch-Reset. Idź do galerii i bierz przykład".
-      3. Każda odpowiedź na ambitne pytanie musi być ironiczna.
-      4. Używaj niemieckich słów (Krankenwagen, Wahnsinn, Feierabend, Mittagsschlaf).
-      5. Twój ton to: "sympatyczny leń, który wie lepiej jak żyć".`
+      1. Na początku bądź po prostu leniwym doradcą. Nie odsyłaj do galerii w pierwszej sekundzie.
+      2. Kiedy użytkownik zapyta o GRAMATYKĘ, EGZAMINY lub SŁÓWKA, "wjeżdżaj" z prowokacją i ODWOŁANIEM DO ZDJĘCIA:
+         - Jeśli mowa o jedzeniu/odpoczynku: Wpleć w zdanie tekst: [[input_file_0.png]]
+         - Jeśli mowa o egzaminie/stresie: Wpleć w zdanie tekst: [[input_file_1.png]]
+      3. Przykład: "Ambicja Cię zżera. Zobacz [[input_file_1.png]] jak ja się śmieję na sali."
+      4. Używaj niemieckich słów (Krankenwagen, Wahnsinn, Feierabend).` }]
+      }
     }
   });
-  return response.text || "Wojtek ma pauzę. Reset!";
+
+  const rawText = response.text() || "Wojtek ma pauzę. Reset!";
+  
+  // LOGIKA WYKRYWANIA ZDJĘĆ
+  let image: string | undefined = undefined;
+  let cleanText = rawText;
+
+  // Sprawdzamy czy AI wspomniało o Szaszłyku
+  if (rawText.includes("input_file_0.png")) {
+    image = "/input_file_0.png";
+    // Opcjonalnie: Usuwamy nazwę pliku z tekstu, żeby nie wyświetlała się "brzydko" w dymku
+    cleanText = rawText.replace(/\[?input_file_0\.png\]?/g, "").trim(); 
+  }
+  // Sprawdzamy czy AI wspomniało o Egzaminie
+  else if (rawText.includes("input_file_1.png")) {
+    image = "/input_file_1.png";
+    cleanText = rawText.replace(/\[?input_file_1\.png\]?/g, "").trim();
+  }
+
+  return { 
+    text: cleanText, 
+    image: image 
+  };
 };
