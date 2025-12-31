@@ -13,11 +13,11 @@ const GalleryView: React.FC = () => {
         {/* Foto 1: Szaszłyk */}
         <div className="group space-y-6">
           <div className="relative rounded-[50px] overflow-hidden border-8 border-yellow-500/10 shadow-[0_0_50px_rgba(251,191,36,0.1)] transition-all duration-700 group-hover:border-yellow-500/30 group-hover:shadow-yellow-500/20">
-            <img 
-              src="input_file_0.png" 
-              alt="Wojtek ze szaszłykiem" 
-              className="w-full h-[600px] object-cover transition-transform duration-1000 group-hover:scale-105"
-            />
+           <img 
+  src="/input_file_0.png"   // <--- Tu dodałem ukośnik
+  alt="Wojtek z szaszłykiem" 
+  className="w-full h-[600px] object-cover transition-transform duration-1000 group-hover:scale-105"
+/>
             <div className="absolute top-6 right-6 bg-black/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-yellow-500/30">
                <span className="text-yellow-500 font-black text-xl italic">10/10 RESET</span>
             </div>
@@ -46,7 +46,7 @@ const GalleryView: React.FC = () => {
         <div className="group space-y-6">
           <div className="relative rounded-[50px] overflow-hidden border-8 border-yellow-500/10 shadow-[0_0_50px_rgba(251,191,36,0.1)] transition-all duration-700 group-hover:border-yellow-500/30 group-hover:shadow-yellow-500/20">
             <img 
-              src="input_file_1.png" 
+              src="/input_file_1.png" 
               alt="Wojtek na egzaminie" 
               className="w-full h-[600px] object-cover transition-transform duration-1000 group-hover:scale-105"
             />
